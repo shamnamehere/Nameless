@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brightwing</title>
+    <style>
+
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Lato:wght@300;400;700&display=swap');
+        
+        :root {
+            /* Data Config */
+            --main-title: "Brightwing";
+            --inventory-title: "Miscellaneous";
+            --sheet-url: "https://docs.google.com/spreadsheets/d/1fCqjePjNSEEvz8DTyXGTjlUlyR5VALe3tjYr8BgJFBo/edit";
+            --link-label: "Tracker and Excerpts";
+            
+            /* Palette: Void & Parchment */
+            --bg-void: #000000;
+            --bg-stone: #0a0a0a;
+            --bg-inset: #050505;
+            
+            --border-stone: #1f1f1f;
+            --border-highlight: #3d3d3d;
+            
+            /* Accents */
+            --accent-moss: #5c7a4c;
+            --accent-moss-glow: rgba(92, 122, 76, 0.4);
+            
+            --accent-bone: #e8dfc5; 
+            --accent-bone-dim: #adba4; /* Kept generic for fallback */
+            --accent-gold: #c5a059;
+            --accent-rust: #8c5e4d;
+            --accent-umber: #3e2b22;
+            
+            /* Text */
+            --text-primary: #dcd6ca;
+            --text-secondary: #9c9488;
+            --text-dim: #635e54;
+            
+            --corner-size: 16px;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Lato', sans-serif; /* Default fallthrough */
+            background-color: var(--bg-void);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 40px 20px;
+            overflow-x: hidden;
+        }
+
+        /* 1. Static Noise Texture */
+        body {
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            background-attachment: fixed;
+        }
+
+        /* 2. Grid Pattern Layer */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(rgba(92, 122, 76, 0.04) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(92, 122, 76, 0.04) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 3. Scanline Overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.1) 2px,
+                rgba(0, 0, 0, 0.1) 4px
+            );
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .character-sheet { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Reduced from 40px to bring sections closer */
+            position: relative;
+            z-index: 1;
+            /* Unified Container Frame */
+            padding: 20px;
+            border: 1px solid var(--border-stone);
+            box-shadow: 0 0 30px rgba(232, 223, 197, 0.04);
+            background-color: var(--bg-void); /* Ensure sheet has background */
+			overflow: hidden;
+        }
+        
+/* Hide scrollbars during the expansion animation to prevent flickering */
+.section-content, 
+.stat-details {
+    scrollbar-width: none; /* For Firefox */
+    -ms-overflow-style: none; /* For Internet Explorer and Edge */
+}
+
+.section-content::-webkit-scrollbar, 
+.stat-details::-webkit-scrollbar {
+    display: none; /* For Chrome, Safari, and Opera */
+}		
+		
+/* SVG Banner Styles */
+.svg-banner-container {
+    width: 100%;
+    margin: 0 auto;
+    text-align: center;
+    position: relative;
+    z-index: 5; /* Keep branches over text */
+    margin-bottom: -50px; /* Original spacing */
+    background-color: transparent;
+    
+    /* This shaves off the top 20% of the black space without moving the banner */
+    clip-path: inset(20% 0 0 0); 
+    /* This fixes the clicking issue */
+    pointer-events: none; 
+    /* This pulls the cropped banner up so the page starts higher */
+    margin-top: -120px; 
+}
+
+.svg-banner-container svg {
+    width: 100%;
+    height: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    border-radius: 4px;
+    background-color: transparent !important;
+}
+
+/* Ensure header is clickable and behind branches */
+.section-header {
+    position: relative;
+    z-index: 4; 
+    pointer-events: auto;
+}
+        
+        /* Enhanced Sway Animation */
+        @keyframes sway {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(1.2deg); }
+        }
+        .branches {
+            /* Transform origin set near the left-hand root of the vector */
+            transform-origin: 10% 40%; 
+            animation: sway 12s ease-in-out infinite;
+        }
+
+        /* Star Twinkle Animation */
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.1; }
+            50% { opacity: 0.5; }
+        }
+        .star {
+            animation: twinkle var(--duration) ease-in-out infinite;
+            animation-delay: var(--delay);
+        }
+
+        /* Cloud Drift Animation - Left to Right */
+        @keyframes cloudsDrift {
+            from { transform: translateX(-400px); }
+            to { transform: translateX(1600px); }
+        }
+        .cloud {
+            animation: cloudsDrift var(--duration) linear infinite;
+            opacity: 0.08;
+            filter: blur(60px);
+        }
+
+        /* Brightwing text with same color as section headers */
+        .brightwing-text {
+            fill: var(--accent-bone); /* Changed to match section header color */
+            filter: drop-shadow(0 0 8px rgba(232, 223, 197, 0.3));
+        }
+
+        /* First section positioned to overlap with banner */
+        #section-detailed.section-placeholder {
+            margin-top: -80px; /* Pulls the section up to overlap with banner */
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Loaders */
+        .loading, .error { 
+            padding: 50px;
+            text-align: center;
+            background: var(--bg-stone);
+            border: 1px solid var(--border-stone);
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(92, 122, 76, 0.2);
+            border-top-color: var(--accent-moss);
+            border-radius: 50%;
+            animation: spin 2s linear infinite;
+            margin-right: 15px;
+            vertical-align: middle;
+            box-shadow: 0 0 10px var(--accent-moss-glow);
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Section Wrappers */
+        .section-wrapper {
+            background: var(--bg-stone);
+            position: relative;
+            border: 1px solid var(--border-stone);
+            box-shadow: 0 20px 50px -10px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        
+        /* Corner Ornament SVG Styling */
+        .ornament-corner {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            pointer-events: none;
+            opacity: 0.35;
+            color: var(--accent-bone);
+            z-index: 0;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.5;
+        }
+        
+        /* Fading tips via opacity on inner paths in SVG, here just ensure positioning */
+        .ornament-top-left { top: 0; left: 0; }
+        .ornament-bottom-right { bottom: 0; right: 0; transform: rotate(180deg); }
+        
+        /* Hairline Crack SVG Styling */
+        .ornament-crack {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            pointer-events: none;
+            opacity: 0.2;
+            stroke: var(--text-dim);
+            stroke-width: 1;
+            fill: none;
+            bottom: 0;
+            left: 20%;
+            z-index: 0;
+        }
+
+/* 1. Make the entire banner container ignore mouse clicks */
+/* This allows you to click "through" the branches to the header below */
+.svg-banner-container {
+    pointer-events: none;
+    z-index: 5; /* Keep it high visually */
+}
+
+/* 2. Ensure the Section Header is positioned to receive clicks */
+.section-header {
+    position: relative;
+    z-index: 4; /* Higher than the background, lower than the banner's visual layer */
+    pointer-events: auto; /* Explicitly allow clicking here */
+    cursor: pointer;
+}
+
+/* 3. Fix the Scanline Overlay blocking everything */
+body::after {
+    pointer-events: none;
+}
+
+        /* Headers */
+        .section-header {
+            padding: 25px 35px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.6rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            background-color: rgba(15, 15, 15, 0.8); /* Slightly lighter than stone */
+            border: none;
+            border-bottom: 1px solid var(--border-stone);
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            color: var(--accent-bone);
+            display: flex;
+            align-items: center;
+            outline: none;
+            position: relative;
+            z-index: 1;
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+        }
+        
+        .section-header:hover { 
+            text-shadow: 0 0 8px rgba(232, 223, 197, 0.4);
+        }
+
+        /* Growing line on hover */
+        .section-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 0%;
+            height: 1px;
+            background: linear-gradient(90deg, var(--accent-moss), var(--accent-gold));
+            transition: width 0.6s ease;
+            opacity: 0.7;
+        }
+        
+        .section-header:hover::after {
+            width: 100%;
+        }
+        
+        .section-arrow {
+            margin-right: 20px;
+            font-size: 0.6em;
+            color: var(--text-dim);
+            transition: transform 0.4s ease;
+        }
+        
+        .section-arrow.open { 
+            transform: rotate(90deg); 
+            color: var(--accent-moss); 
+        }
+        
+        .section-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.6s cubic-bezier(0, 1, 0, 1);
+            background: var(--bg-stone);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .section-content.open { 
+            max-height: 8000px; 
+            transition: max-height 1s ease-in-out;
+        }
+
+        .stat-item {
+            border-bottom: 1px solid var(--border-stone);
+            position: relative;
+        }
+        .stat-item:last-child { border-bottom: none; }
+        
+        .stat-textbox {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+            border-left: 2px solid transparent;
+        }
+        
+        /* Stat Hover Effects */
+        .stat-textbox.clickable:hover {
+            background: rgba(232, 223, 197, 0.03);
+            border-left-color: var(--accent-moss);
+            box-shadow: -5px 0 10px -2px var(--accent-moss-glow);
+            cursor: pointer;
+        }
+        
+        .stat-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.1rem;
+            font-weight: 600; /* Bumped up for Garamond */
+            color: var(--text-primary);
+            letter-spacing: 0.03em;
+            transition: text-shadow 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-left: 8px; /* Added spacing where icon used to be */
+        }
+        
+        .stat-textbox.clickable:hover .stat-name {
+            text-shadow: 0 0 5px rgba(232, 223, 197, 0.6);
+        }
+        
+        .stat-value {
+            font-family: 'Cormorant Garamond', serif;
+            font-variant-numeric: oldstyle-nums;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--accent-bone);
+            transition: text-shadow 0.3s ease;
+        }
+
+        .stat-textbox.clickable:hover .stat-value {
+            text-shadow: 0 0 8px rgba(197, 160, 89, 0.5);
+        }
+        
+.stat-details {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.6s ease-in-out; /* Smoother transition for long text */
+    background: var(--bg-inset);
+    background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(255, 255, 255, 0.02) 4px
+    );
+}
+
+.stat-item.active .stat-details {
+    max-height: 5000px; /* Increased significantly to accommodate long lore */
+    border-top: 1px solid var(--border-stone);
+    border-bottom: 1px solid var(--border-stone);
+    overflow-y: visible; /* Allows the content to breathe */
+}
+
+.details-content {
+    padding: 30px 60px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.2rem;
+    line-height: 1.7; /* Slightly increased for better readability of long blocks */
+    color: var(--text-secondary);
+    text-shadow: 0 0 2px rgba(232, 223, 197, 0.15);
+    word-wrap: break-word; /* Ensures long words don't break the layout */
+    white-space: pre-wrap; /* Preserves line breaks from your Google Sheet */
+}
+        
+        .details-content p {
+            margin-bottom: 1em;
+        }
+        .details-content p:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Attributes Grid */
+        .attributes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px;
+        }
+        
+        .attribute-item {
+            padding: 15px;
+            border: 1px solid var(--border-stone);
+            background: var(--bg-stone);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        /* Attribute Card Glows */
+        .attribute-item.red:hover { box-shadow: 0 0 15px rgba(140, 94, 77, 0.3); }
+        .attribute-item.green:hover { box-shadow: 0 0 15px rgba(92, 122, 76, 0.3); }
+        .attribute-item.blue:hover { box-shadow: 0 0 15px rgba(110, 133, 153, 0.3); }
+        .attribute-item.purple:hover { box-shadow: 0 0 15px rgba(138, 122, 148, 0.3); }
+        .attribute-item.yellow:hover { box-shadow: 0 0 15px rgba(197, 160, 89, 0.3); }
+
+        .attribute-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            align-items: baseline;
+        }
+        
+        .attribute-name {
+            font-family: 'Lato', sans-serif;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-dim);
+            letter-spacing: 0.15em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .attribute-value {
+            font-family: 'Cormorant Garamond', serif;
+            font-variant-numeric: oldstyle-nums;
+            font-weight: 700;
+            font-size: 1.6rem;
+            color: var(--accent-bone);
+            text-shadow: 0 0 5px rgba(232, 223, 197, 0.2);
+        }
+        
+        /* Progress Bars */
+        .progress-container {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            width: 100%;
+            border-radius: 1px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+        }
+        
+        .progress-bar {
+            height: 100%;
+            position: relative;
+        }
+        
+        /* Static Glows */
+        .red { color: var(--accent-rust) !important; }
+        .progress-bar.red { background: var(--accent-rust); box-shadow: 0 0 8px var(--accent-rust); }
+        
+        .green { color: var(--accent-moss) !important; }
+        .progress-bar.green { background: var(--accent-moss); box-shadow: 0 0 8px var(--accent-moss); }
+        
+        .blue { color: #6e8599 !important; }
+        .progress-bar.blue { background: #6e8599; box-shadow: 0 0 8px #6e8599; }
+        
+        .purple { color: #8a7a94 !important; }
+        .progress-bar.purple { background: #8a7a94; box-shadow: 0 0 8px #8a7a94; }
+        
+        .yellow { color: var(--accent-gold) !important; }
+        .progress-bar.yellow { background: var(--accent-gold); box-shadow: 0 0 8px var(--accent-gold); }
+
+        /* Two Column Grid */
+        .two-column-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1px;
+            background: var(--border-stone);
+            padding: 1px 0; 
+        }
+        
+        .two-column-grid .stat-item {
+            background: var(--bg-stone);
+            border-bottom: none;
+        }
+        
+        /* Vertical Divider Gradient */
+        .two-column-grid .stat-item:nth-child(even)::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 15%; bottom: 15%;
+            width: 1px;
+            background: linear-gradient(to bottom, transparent 0%, var(--border-stone) 50%, transparent 100%);
+        }
+
+        .sheet-link-item {
+            grid-column: 1 / -1;
+            background: var(--bg-inset) !important;
+            margin: 20px 40px;
+            border: 1px dashed var(--border-stone) !important;
+            border-radius: 2px;
+        }
+        
+        .sheet-link-text { 
+            color: var(--accent-moss) !important;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 20px 10px; }
+            .character-sheet { padding: 10px; gap: 10px; }
+            .svg-banner-container { margin-bottom: -30px; }
+            .svg-banner-container svg { max-height: 180px; }
+            #section-detailed.section-placeholder { margin-top: -40px; }
+            .attributes-grid { grid-template-columns: 1fr; padding: 25px; }
+            .two-column-grid { grid-template-columns: 1fr; }
+            .two-column-grid .stat-item:nth-child(even)::before { display: none; }
+            .stat-textbox { padding: 15px 20px; }
+            .details-content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="character-sheet">
+        <!-- SVG Banner -->
+        <div class="svg-banner-container">
+            <svg id="banner-svg" viewBox="0 0 1500 692" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+                <!-- Background Sky REMOVED - will be transparent -->
+                
+                <!-- Starry Night Layer (Generated via JS) -->
+                <g id="stars-container"></g>
+
+                <!-- Drifting Clouds Layer -->
+                <g id="clouds">
+                    <ellipse class="cloud" cx="0" cy="150" rx="350" ry="90" fill="#1e1e22" style="--duration: 70s;" />
+                    <ellipse class="cloud" cx="0" cy="380" rx="450" ry="130" fill="#18181b" style="--duration: 90s; animation-delay: -25s;" />
+                </g>
+
+                <!-- Vector Background (Branches) - Brightened for aesthetic cohesion -->
+                <path class="branches" fill="#2a2a2e" d="M694.77 120.5c5.59-.39 11.05 1.02 16.42 2.37 8.97 2.56 18.83-1.64 27.29 3.31-2.41 1.42-4.8 3.17-7.67 3.39-9.17.67-18.26-1.22-27.21-2.92-9.79-1.79-19.55.84-29.13 2.57-8.76 1.41-17.45 3.24-26.09 5.25l-.16 2.33c9.56.95 19.15 1.51 28.74 2.06 7.42.48 14.89-.19 22.28.73 6.73.8 12.85 4.35 19.68 4.61 8.95.36 17.74-1.74 26.43-3.57 9.74-2.07 19.77-2.29 29.44-4.7 8.14-1.83 15.99-5.12 24.38-5.63 9.09-.54 18.02 1.66 26.8 3.75 8.69 2.22 17.91.52 26.51 3.31 3.87.90 7.08 3.32 10.04 5.86l-2.88 2.72c-7.45-2.31-14.88-4.87-22.64-5.86-7.73-1.12-15.59-.73-23.31-1.86-6.21-.85-12.37-2.53-18.69-2.13-9.40.40-17.67 5.53-26.83 7.12-10.43 1.89-20.93 3.46-31.48 4.48-7.15.69-14.35 1.68-21.54 1.10-7.89-.59-15.24-4.04-23.13-4.57-10.60-.72-21.24-1.09-31.86-.69-7.35.11-14.95.50-21.99-2.03-4.24-1.44-8.60-3.78-13.21-2.62-7.87 1.86-15.32 5.17-23.19 7.07-9.65 2.42-18.77 7.05-26.17 13.73-4.47 4.08-7.21 9.55-10.23 14.70-5.80 10.06-13.29 19.37-22.83 26.12-7.89 5.50-16.06 10.59-23.91 16.15-5.72 4.18-11.89 8.00-16.54 13.43-5.06 6.19-4.29 14.70-3.72 22.14 8.47-3.39 16.70-7.35 25.17-10.75 9.51-3.78 15.87-12.23 24.44-17.50 8.26-4.91 16.49-11.91 26.73-11.15-2.99 4.09-7.08 7.15-11.62 9.30-9.13 4.48-16.70 11.42-25.38 16.61-11.34 7.14-23.39 13.07-34.67 20.29-5.59 3.60-12.79 5.71-16.12 11.93-3.48 6.65-4.34 14.24-6.65 21.31-2.09 6.37-4.43 12.71-5.30 19.40 3.39-1.70 6.75-3.55 9.55-6.15 6.89-6.44 13.27-13.43 20.49-19.53 6.11-5.17 13.46-8.49 20.10-12.89 7.94-5.21 13.96-12.72 21.36-18.60 4.85-4.03 10.20-7.45 16.03-9.87 2.95-1.46 6.62-2.60 8.06-5.88 2.44-5.30 3.50-11.29 7.18-15.97 3.35-4.71 8.71-7.83 14.46-8.39 7.57-.84 15.20-.85 22.78-1.66 15.27-1.81 30.52 3.78 43.01 12.27 4.15 2.84 8.97 4.95 14.10 4.78 8.43-.13 16.89-1.15 25.31-.02 15.83 1.97 31.54 6.17 47.62 5.15 11.32-.68 21.85-5.57 33.12-6.64 8.63-.85 17.35.01 25.98-1.13 12.12-1.63 24.89-.61 36.05 4.69 6.22 2.82 12.05 6.84 18.91 7.99 8.92 1.52 18.12.17 26.98 2.24 12 2.74 22.91 8.67 33.94 13.95 9.37 4.44 19.13 8.04 29.04 11.06 5.26 1.51 10.73 3.04 16.25 2.33 5.34-.71 10.30-2.94 15.40-4.59 7.94-2.61 16.06-4.88 24.41-5.72 8.46-.86 17.15-1.80 25.52.29 8.77 2.22 17.63 4.09 26.33 6.61l-.49 3.95c-7.24-.58-14.32-2.23-21.33-4.03-9.67-2.39-19.84-2.59-29.59-.60-9.15 1.84-18.40 4.13-26.66 8.60-4.13 2.04-6.63 7.87-3.62 11.81 4.62 5.69 12.27 7.11 18.27 10.83 2.32 1.40 3.57 3.92 5.01 6.12-4.23-.43-8.40-1.13-12.58-1.81.14 6.96.16 14.70 4.85 20.36 5.56 6.50 13.67 9.89 20.98 13.98 8.93 4.36 16.82 10.44 24.31 16.91 10.57-3.53 22.16-5.71 33.07-2.34 5.57 1.49 10.72 4.92 16.65 4.74 4.57-.23 9.01-1.45 13.51-2.19 4.26-.86 8.76-1.27 12.61-3.45 3.61-2.35 5.79-6.22 8.39-9.54 3.89-5.37 8.81-9.88 12.80-15.16 3.27-4.53 6.35-9.73 12.04-11.50-1.95 8.56-10.27 13.24-13.57 21.14 5.82-.62 11.69-1.79 17.55-.90 4.64.60 9.14 2.33 13.86 2.22 4.67-.55 8.58-3.48 12.77-5.37 6.53-3.31 13.97-4.19 21.21-3.99 10.13.20 20.52 2.74 30.46-.32 9.06-2.52 16.42-8.59 23.41-14.58 7.29-6.30 17.04-7.86 25.78-11.18 7.05-2.44 13.96-5.90 21.52-6.36 2.77-.20 4.62 2.24 6.73 3.64-14.04 2.18-27.84 6.12-40.64 12.34-7.04 3.76-14.54 7.70-18.71 14.84 9.21.10 18.40.89 27.41 2.89l.06 3.51c-10.43 2.26-20.78-2.29-31.23-.85-7.73.83-14.90 4.74-22.78 4.39-8.96-.40-17.70-3.60-26.74-2.69-9.94.77-17.70 8.58-27.68 9.17-8.41.90-16.53-3.40-24.91-1.83-6.41 1.41-13.00 4.55-16.24 10.57-2.82 5.00-6.54 9.38-10.81 13.19 5.38 3.43 10.85 6.95 17.02 8.78 4.64 1.41 9.51 1.78 14.27 2.70-2.64 2.64-5.75 5.60-9.84 4.78-8.97-1.26-15.86-8.06-24.52-10.37-10.74-4.03-22.67-.25-33.30-4.62-5.35-1.99-10.55-4.74-16.32-5.22-5.25-.34-10.43.83-15.52 1.95 4.48 7.35 11.17 12.97 16.00 20.06 3.56 4.99 7.03 10.43 12.55 13.48 7.15 3.94 15.36 5.10 23.24 6.76 8.21 1.36 16.07 4.24 24.24 5.76 8.00 1.64 14.33-4.78 21.84-6.09 11.36-2.14 22.79-4.01 34.32-4.95 9.32-1.09 19.61-1.36 27.13-7.78 8.56-7.28 18.44-12.75 27.14-19.86 4.20-3.26 8.42-7.38 14.07-7.60 4.41-.73 9.67.26 13.26-3.02 7.34-6.78 9.63-17.28 16.95-24.10 5.09-4.75 10.82-9.14 17.43-11.53 3.16-1.43 6.33.40 9.19 1.68-7.24 4.83-15.57 7.75-22.60 12.89-5.52 3.98-6.84 11.06-10.69 16.31-3.02 4.03-6.24 7.91-8.89 12.20 2.96 1.32 5.88 3.50 9.25 3.33 4.30-1.25 7.62-4.46 11.48-6.59 6.06-3.14 12.22-6.58 19.06-7.63-1.91 5.73-7.74 7.88-12.81 9.94-6.88 2.72-11.71 9.07-18.91 11.08-4.79 1.22-8.82-2.45-12.68-4.67-3.72 4.49-7.01 9.33-9.65 14.53 9.85.92 19.89.82 29.51 3.47 8.77 2.39 18.13 3.22 26.96.57 11.14-3.21 22.52-5.54 33.76-8.36 7.66-1.72 14.34-8.16 22.61-6.04l-.54 3.53c-5.26 2.61-10.63 5.15-16.40 6.39-7.25 1.62-14.63 2.75-21.71 5.04-10.45 3.05-21.18 7.27-32.25 5.26-11.50-2.06-23.19-3.58-34.89-2.84 3.17 2.69 6.74 4.93 10.66 6.38 8.40 3.14 16.70 6.54 24.99 9.96l-.74 4.04c-5.49-1.55-10.72-3.86-15.69-6.63-7.18-4.06-15.52-5.38-22.69-9.44-2.57-1.36-5.05-2.89-7.77-3.90-8.09-2.53-16.80-2.64-25.19-2.02-4.99.52-9.49 2.83-14.06 4.71-7.26 3.02-15.05 4.48-22.83 5.29-11.85 1.02-23.66 2.92-35.04 6.41 4.49 2.18 9.30 3.67 14.28 4.17 13.30 1.52 27.09 3.65 40.20-.19 8.65-2.76 17.03-6.66 26.10-7.86 3.24-.51 6.20 1.15 9.08 2.37-2.26 1.72-4.57 3.82-7.58 3.84-5.87.44-11.89.54-17.39 2.89-7.24 3.00-14.85 5.17-22.71 5.50-11.08 1.07-22.08-1.06-33.10-1.82-21.84-1.12-43.89-3.02-64.87-9.55-10.34-3.19-20.69-7.64-28.29-15.60-7.00-7.36-13.62-15.07-20.07-22.92-1.97-2.15-4.13-4.98-7.37-4.76-7.81.29-15.44 2.76-23.30 2.30-9.63-.42-19.73-3.74-29.06.21-5.97 3.01-9.88 8.71-14.76 13.10-6.89 7.02-15.02 12.62-23.55 17.45-3.14 2.18-7.89 4.51-7.53 9.00 3.28 4.08 9.04 3.07 13.64 2.94 2.86.06 6.30-.81 8.72 1.13 2.52 2.62.08 6.81-2.97 7.65-4.68 1.46-9.68.93-14.49.68-8.81-.73-17.75-1.18-26.49.45-2.93.58-6.00 1.43-8.19 3.58 1.69 6.64 6.27 12.27 7.38 19.13 2.74 10.81-.45 21.87-4.72 31.82-2.81 6.86-6.03 14.68-3.03 22.04 3.72 9.38 14.38 13.28 18.70 22.24 3.60 7.46 3.36 16.27 7.66 23.46 2.61 4.41 7.29 6.93 11.74 9.13 11.61 5.58 23.34 10.92 35.29 15.73 5.67 2.28 11.57 4.63 15.91 9.12 4.11 4.22 7.93 8.73 11.91 13.09 3.06 3.27 5.50 7.31 9.40 9.68 4.39 1.41 8.98-.56 13.25-1.63 13.91-4.37 28.17-7.75 41.67-13.35 13.85-5.55 26.42-13.70 39.75-20.31 6.81-3.34 13.52-7.23 21.02-8.79 11.59-2.30 23.20 2.63 34.80.52 5.19-.91 8.84-5.03 12.85-8.08 6.36-4.93 12.76-9.82 18.76-15.19 4.94-4.22 10.33-9.21 17.31-8.89 9.51-.29 17.16 6.33 26.16 8.14 4.39 1.10 8.15-1.88 11.40-4.38 6.91-5.57 15.72-7.72 23.30-12.14l2.64 1.07c-1.43 2.17-2.73 4.51-4.72 6.24-2.92 2.08-6.46 2.96-9.63 4.54-7.16 3.14-11.52 10.95-19.50 12.47-5.43 1.18-10.35-1.99-15.07-4.14-5.93-2.80-12.97-5.18-19.38-2.48-10.06 4.33-20.28 10.48-24.98 20.87 10.42.19 20.77-2.12 31.20-1.26 8.26.46 16.37 2.72 24.68 2.48 5.79-.10 10.23-4.24 14.63-7.49 8.19-6.27 16.92-11.78 25.49-17.50 8.76-5.83 13.88-15.33 19.09-24.16-4.94-4.36-10.67-7.62-16.10-11.28-6.23-4.09-8.30-12.37-15.19-15.65-5.35-2.52-10.96-4.48-16.00-7.61 3.37-1.97 7.48-2.39 11.04-.61 11.84 4.16 19.05 14.98 28.59 22.44 3.47 2.54 6.97 5.65 11.36 6.35 5.29-1.46 9.69-5.07 14.85-6.96 11.22-4.13 18.85-13.85 28.93-19.88l1.33 2.38c-4.64 5.94-10.03 11.28-16.08 15.77-6.98 5.59-15.79 7.84-23.71 11.68 4.35 4.93 8.42 10.83 14.75 13.33 3.21-.49 5.70-2.81 8.19-4.73 3.95-3.40 8.21-6.45 11.97-10.07 5.68-5.46 8.69-13.12 14.69-18.30 6.68-5.79 14.73-9.79 21.33-15.69 6.17-5.64 7.07-14.56 11.70-21.25 5.29-7.76 11.26-15.88 20.32-19.46-3.77 10.06-13.19 16.34-17.84 25.85-3.09 6.14-5.19 12.96-10.01 18.05-7.08 7.63-17.71 10.60-24.93 18.08-4.10 4.28-5.87 10.09-9.10 14.95-3.11 4.76-7.58 8.39-11.94 11.94-5.94 4.71-11.87 9.46-17.41 14.63-6.14 5.82-13.43 10.46-18.47 17.37 3.57 1.14 7.21 2.14 10.74 3.46 6.10 2.15 11.45 5.92 17.37 8.48 7.98 3.43 16.96 3.06 25.37 1.77 5.66-.81 11.14-2.93 16.92-2.88 3.17.20 6.13 1.42 9.11 2.46l-.10 3.40c-13.80 2.18-27.78 3.83-41.77 3.39-11.68-.49-21.31-7.81-31.98-11.61-7.33-2.68-15.39-2.43-22.89-.62-12.37 2.85-24.53 7.61-37.41 7.26-12.93-.46-25.71-3.14-38.66-3.05-12.02.14-22.18 8.26-34.18 8.51-10.80.99-21.32-4.05-32.08-1.96-7.31 1.06-13.22 5.71-18.60 10.43-8.11 7.18-19.64 6.06-29.28 9.66-19.12 6.67-37.71 14.74-56.30 22.75-7.21 3.00-13.93 7.04-21.18 9.93-3.52 1.60-7.46.33-10.35-1.93-8.54-5.80-10.71-17.03-18.94-23.17-13.46-10.57-29.52-17.05-45.00-24.02-7.28-3.49-15.20-6.22-21.22-11.77-6.53-6.66-6.01-16.71-9.04-25.00-2.97-9.91-10.53-17.29-17.11-24.90-4.79-5.40-9.43-12.25-7.90-19.86 2.57-13.18 11.14-25.02 10.61-38.82-.45-10.30-7.57-18.57-14.98-24.99-10.55-8.99-22.11-16.70-33.57-24.46-15.63-10.80-31.61-21.08-47.46-31.56-9.12-6.07-17.48-13.19-26.30-19.68-6.55-4.78-13.36-9.74-21.38-11.62-6.25-1.50-12.24 1.56-18.26 2.71-7.37 1.57-14.82-.99-21.51-3.91-7.18-3.09-12.13-9.88-19.72-12.19-8.68-2.77-18.58-3.93-25.22-10.85-8.33-7.83-9.35-20.54-17.84-28.18-8.82-7.14-20.13-10.12-31.10-12.08-10.37-1.71-19.51-8.64-30.33-7.84-17.55.78-33.02 10.43-46.56 20.83-3.02 2.16-4.77 5.51-6.39 8.75 5.29-.69 10.44-2.06 15.60-3.40 6.98-1.66 14.80-2.42 21.36 1.12 5.28 2.55 8.64 7.54 11.85 12.24 1.65 2.13 3.32 4.94 6.29 5.22 3.96.27 7.89-.53 11.84-.77 7.32-.53 14.65.45 21.86 1.71-1.16 1.61-2.36 3.70-4.23 4.45-6.27.41-12.47-2.09-18.75-.91-6.00.67-12.77 3.31-18.29-.37-6.98-4.27-8.28-13.72-15.08-18.04-9.77-2.39-18.49 4.59-27.93 5.89-6.59 1.53-14.71-.02-19.79 5.37-5.22 5.53-9.13 12.16-14.48 17.58-5.64 6.18-13.23 9.95-19.84 14.93 3.65 1.56 7.32 3.13 11.11 4.35 1.70.40 3.64 1.20 5.29.18 4.38-2.52 7.91-6.38 12.61-8.39 7.40-3.28 15.65-4.25 22.84-8.09 9.01-4.61 16.95-12.31 27.60-12.81 4.00-.78 7.70 1.17 10.86 3.41-6.36 2.05-13.13 2.27-19.46 4.36-7.70 2.61-12.80 9.40-19.72 13.33-6.67 3.92-14.89 4.22-21.24 8.80-4.70 3.30-9.43 6.56-14.50 9.28 4.82 8.17 12.76 14.01 16.86 22.64 3.14 6.77 9.39 11.35 12.80 17.96-3.02-.97-6.32-1.75-8.59-4.12-4.09-4.15-6.51-9.55-9.95-14.18-4.10-5.80-10.24-9.96-13.47-16.40-2.50-4.31-4.06-9.82-8.90-12.13-4.06-1.89-8.64-3.52-13.17-2.74-5.03 1.38-9.23 4.68-13.98 6.74l-20.82 9.11c-10.45 4.82-21.87 6.71-32.76 10.22-14.61 4.63-29.08 10.43-41.46 19.62-6.76 5.28-14.80 9.11-20.11 16.05 11.19.33 22.50-1.23 33.03-5.07 4.91-1.77 10.02-2.94 15.20-3.56-.38 3.09-.09 6.74-2.56 9.07-3.64 3.31-7.91 5.83-11.74 8.90a54.69 54.69 0 0 0 15.99 6.12c7.31 1.61 14.33 4.35 20.89 7.96 6.72 3.33 13.73 7.73 21.57 6.74 5.64-.76 11.21-2.32 16.41-4.66 4.29-1.91 8.10-5.26 12.96-5.61 5.11-.34 10.29.23 15.37-.77 6.57-1.23 13.10-2.77 19.77-3.41 5.19-.73 10.61-.68 15.57-2.58 4.02-2.07 6.33-6.23 9.84-8.96 6.72-5.72 17.01-4.21 23.21-10.76 6.28-6.41 12.91-12.47 19.66-18.39 2.24-1.83 4.62-3.84 7.58-4.30 3.43-.17 6.69 1.20 9.91 2.22-8.27 5.39-19.24 9.24-22.82 19.33 3.80 3.69 8.41 6.41 12.87 9.23 9.04 5.64 20.43 3.30 29.86-.09 9.69-3.79 20.10-5.67 30.50-5.41 6.79.16 13.77.46 20.30-1.80 7.61-2.28 14.24-7.67 22.40-8.04 7.05-.29 14.35 1.01 21.15-1.48 6.37-2.01 11.38-7.04 17.93-8.52 4.02-.96 7.37 2.00 10.30 4.29-9.20 3.52-18.78 6.36-27.40 11.20 3.75 5.60 11.08 4.76 16.93 4.88 9.40-.33 18.60 2.47 28.02 1.83 7.19-.49 14.42-.22 21.53.99-1.65 2.79-2.88 6.96-6.69 7.26-5.60.54-10.99-1.50-16.46-2.27-8.61-1.49-17.30.36-25.95-.23-7.51-.48-15.03-1.96-21.87-5.18-4.89-2.24-9.95-4.88-15.50-4.44-9.40.47-17.33 6.02-25.96 9.07-11.75 3.70-23.79-3.04-35.65-.33-5.12 1.24-9.37 4.50-14.00 6.84-5.27 2.86-11.20 4.02-16.99 5.34l9.33 6.30.25 3.39c-3.64.04-7.63.43-10.75-1.82-7.53-4.99-13.72-11.71-21.06-16.94-3.85-3.03-8.89-1.56-13.20-.69-5.07 1.22-10.30 1.62-15.33 2.95-7.76 2.27-11.86 10.44-19.47 13.01-5.36 1.69-11.03 1.85-16.52 2.91-17.98 2.83-35.29 8.56-52.95 12.80-1.62.81-4.85.76-4.86 3.14.95 2.54 2.76 4.68 3.63 7.24.52 1.62-1.35 2.35-2.41 3.10-2.52 1.64-5.72 1.31-8.28-.03-7.83-3.79-14.53-9.42-21.32-14.75-7.43-5.83-16.67-8.41-25.44-11.49-7.50-2.40-14.86-5.19-22.33-7.67-10.05-3.34-20.93-2.81-31.18-.77-6.03 1.09-11.80 3.57-16.49 7.54-8.63 7.18-17.77 13.74-27.14 19.92-7.30 4.75-16.27 5.15-24.70 5.36-14.78.17-29.78.50-44.09 4.60-9.91 2.65-19.43 6.69-28.24 11.95-11.48 6.74-21.74 15.46-33.86 21.10-13.02 6.11-26.64 11.67-41.08 13.10-12.34 1.40-24.68 2.80-36.92 4.92-5.18.94-10.36 2.41-14.84 5.26-5.68 3.54-9.91 8.87-13.71 14.28-5.50 7.92-10.95 15.88-15.75 24.25-15.16 26.39-29.44 53.30-45.76 79.00v-80.16c4.58-6.53 10.12-12.30 15.25-18.40 7.35-8.65 15.50-16.67 21.82-26.15 3.20-4.72 6.38-9.54 10.59-13.44 6.84-6.53 15.70-10.31 24.45-13.54 8.38-3.06 17.25-4.26 25.92-6.20-.42-12.19-3.99-23.98-4.73-36.12-.65-12.89 4.59-25.07 10.01-36.46 8.02-15.72 17.85-30.46 28.57-44.45 9.53-12.38 17.18-26.54 29.54-36.49 5.18-4.46 11.48-7.24 17.26-10.79 4.10-2.51 6.86-6.53 10.28-9.79 1.78-1.79 4.44-1.93 6.76-2.49-2.92 9.83-12.57 14.74-20.77 19.54-7.27 3.71-14.35 8.18-19.27 14.84-7.87 10.28-15.91 20.93-19.94 33.40 14.07-8.61 25.83-20.37 38.26-31.09 4.67-4.03 10.32-6.55 15.76-9.32 7.37-3.68 12.08-10.74 16.79-17.20 3.42-4.58 4.33-10.32 5.45-15.77 1.30-6.64 4.80-12.56 6.53-19.07 1.36-4.82 1.93-9.85 3.60-14.58.86-2.84 3.59-4.39 5.92-5.90-1.70 13.95-9.66 26.27-10.94 40.30 8.25-7.50 14.13-17.12 19.77-26.63 2.54-4.28 5.53-8.35 9.33-11.61 9.29-8.01 20.84-12.85 30.05-20.98 6.54-5.65 13.92-10.58 22.41-12.69-.45 1.88-.35 4.05-1.48 5.68-2.90 2.70-6.71 4.06-10.17 5.88-10.68 5.03-19.26 13.32-28.93 19.90-4.90 3.40-10.28 6.27-14.29 10.78-5.04 5.65-8.03 12.70-11.76 19.21-3.93 7.19-9.98 12.95-13.78 20.24a516.78 516.78 0 0 0 17.13 1.65c.89-4.14.92-9.11 4.40-12.09 4.56-3.76 10.69-4.29 16.14-5.99 4.17-1.09 7.88-3.34 11.77-5.11 2.89-1.35 6.13-1.23 9.24-1.25l-.23 3.07c-8.04 2.56-15.16 7.37-23.32 9.56-2.68.98-5.72 1.46-7.89 3.43-1.38 2.59-1.43 5.64-1.91 8.48 6.28.33 12.65.24 18.81 1.71 4.66 1.03 9.40 2.61 14.23 1.81 8.54-1.30 15.75-6.78 24.22-8.28 2.17 3.02-1.65 6.10-4.00 7.60-9.03 5.04-19.89 7.57-30.14 5.38-7.25-1.31-14.82-3.27-22.13-1.37-4.43 2.21-6.68 7.18-11.03 9.55-4.14 2.18-8.85 2.82-13.35 3.93-11.05 2.46-21.88 5.82-33.01 7.93-8.40 1.53-14.53 7.86-20.56 13.37-8.59 7.74-16.69 16.02-25.70 23.28-4.43 3.65-9.91 5.53-14.84 8.33-5.01 2.86-7.04 8.59-9.46 13.48-4.28 9.46-10.15 18.09-14.33 27.59-1.98 4.45-3.23 9.31-2.92 14.21.29 7.40 3.36 14.30 4.38 21.59.77 5.45 1.28 10.94 2.18 16.37 4.62-3.11 9.42-6.32 12.52-11.06 3.89-5.80 4.55-13.01 7.77-19.13 3.38-6.68 9.28-11.56 13.24-17.84 3.13-4.79 4.92-10.31 6.02-15.88 1.18-5.21 1.70-10.81 4.75-15.35 2.42-3.17 6.16-4.85 9.68-6.48-1.41 4.62-3.74 8.86-5.97 13.11-3.17 6.08-3.53 13.05-4.18 19.74 2.72-.45 5.44-1.05 8.22-1.04 5.42-.09 10.83 1.80 16.24.62 5.25-1.22 10.32-3.89 13.80-8.07 4.53-5.63 6.83-12.88 12.31-17.78 6.98-6.72 17.53-7.71 24.41-14.55 6.26-6.11 9.58-14.39 14.75-21.30 5.36-7.17 14.26-10.22 20.29-16.67 5.38-5.28 8.25-12.40 12.74-18.34 1.77-2.55 4.99-3.16 7.73-4.14-2.07 5.48-4.96 10.67-8.89 15.04-2.83 3.04-5.06 6.60-6.27 10.59 6.18-.66 12.30-1.91 18.21-3.84 8.50-2.73 16.21-7.35 23.79-11.97 6.28-3.81 11.64-8.93 18.06-12.53-1.39 3.51-2.92 7.18-5.98 9.59-6.23 5.11-13.67 8.38-20.52 12.52-5.33 3.04-10.32 6.78-16.12 8.93-6.58 2.44-13.79 2.16-20.43 4.37-5.84 1.94-11.32 5.07-15.89 9.21-5.48 5.01-8.90 11.73-13.59 17.40-4.82 5.84-10.38 11.35-17.31 14.60-3.85 1.90-8.05 3.09-11.62 5.52-3.34 2.52-4.87 6.57-6.93 10.07-3.38 6.12-8.92 10.55-13.34 15.85 7.76 1.19 15.63.99 23.46 1.03l-.33 4.32c-8.84-.11-17.67-.76-26.50-.23-6.36.38-12.68-.85-19.03-.53-5.11.26-8.81 4.21-12.51 7.26-3.83 3.49-8.36 6.25-11.65 10.31-2.77 3.76-3.57 8.49-5.44 12.70-2.34 5.58-6.12 10.39-9.10 15.63 14.14-.13 28.64-3.23 40.44-11.33 10.78-7.06 18.80-17.62 29.99-24.11 8.98-5.24 18.80-9.28 29.12-10.87 7.32-1.22 14.75-1.30 22.15-1.24 15.35 0.00 31.11-2.40 44.71-9.85 10.80-6.07 17.34-17.00 23.97-27.03 4.09-6.44 10.61-10.74 15.12-16.83 2.55-3.42 5.61-6.43 9.22-8.71-.25 4.21-.50 8.92-3.84 11.99-4.44 4.29-9.98 7.77-12.35 13.77 5.23-1.95 10.38-4.75 13.76-9.33 7.26-8.86 9.23-20.59 10.28-31.66.56-6.63.05-13.68 3.28-19.74 3.26-6.49 10.08-10.39 12.92-17.15 3.06-7.00 4.29-14.63 6.75-21.85 1.49 1.29 3.87 2.79 3.22 5.12-1.10 6.14-3.70 11.91-6.14 17.62-2.70 6.26-7.48 11.23-10.92 17.04-3.99 6.85-3.09 15.06-4.21 22.61-.88 8.51-3.58 16.66-6.71 24.57 6.99-3.24 14.29-6.06 20.61-10.55 6.80-5.04 9.73-13.25 13.69-20.38 3.60-5.72 8.53-10.55 13.89-14.62 1.06 1.60 2.93 3.65 1.81 5.67-1.99 3.46-5.34 5.85-7.89 8.88-3.96 4.31-6.24 9.80-8.24 15.22 6.89-2.06 13.09-5.75 19.52-8.88 12.49-5.74 25.57-10.34 39.10-12.90 5.75-1.27 11.84-1.97 16.96-5.09 4.54-2.88 5.48-8.57 6.94-13.32 1.98-7.69 6.00-14.62 8.61-22.08 2.53-7.14 4.45-14.48 6.31-21.82 1.88-7.53 2.73-15.63.42-23.17-1.57-5.21-4.97-9.55-7.84-14.08-3.04-4.72-5.15-10.01-8.62-14.45-1.82-2.53-4.12-4.83-5.12-7.84-.69-3.22.08-6.52.77-9.68 3.40-13.59 10.12-26.14 13.21-39.82 2.14-10.09-3.00-19.62-4.06-29.50l8.56 2.12c.95 9.86 2.24 19.93.05 29.73-2.52 11.47-4.71 23.02-6.67 34.59-1.01 6.39-2.07 13.45 1.22 19.38 2.48 4.42 5.92 8.65 10.67 10.72 3.37-1.61 3.89-5.93 5.47-8.98l3.13-.62c0 3.95-.03 7.95-.99 11.81-1.12 4.76-2.83 9.52-2.53 14.48.16 2.80 2.55 4.67 4.19 6.70l4.63-16.87c1.39-4.73 1.68-9.68 2.82-14.46.69-3.09 3.39-5.08 5.83-6.82 11.95-8.15 26.07-12.22 38.45-19.59 5.00-2.92 8.74-7.50 11.58-12.47 4.84-8.31 10.46-16.12 15.87-24.07 4.54-6.74 10.91-12.13 18.17-15.74 14.91-7.39 31.42-10.33 47.38-14.58 11.82-3.19 24.08-4.20 35.92-7.31 9.11-2.25 18.53-2.70 27.86-3.29M607.70 225.68c-4.92 1.33-7.05 6.68-8.03 11.20 5.91 1.28 12.07.93 17.94 2.50 12.98 3.37 25.45 8.55 37.31 14.77 11.07 6.09 22.41 12.54 30.71 22.26 5.50 6.17 3.99 16.00 10.42 21.49 4.96 4.09 10.92 6.74 16.81 9.20 8.28 3.40 17.27 4.27 26.12 4.92a48.72 48.72 0 0 1 20.79 6.28c16.91 9.50 31.07 22.97 46.74 34.26 26.98 18.96 55.64 35.41 82.70 54.24 3.81 2.34 8.51 1.49 12.71.97 8.06-1.18 15.53-4.94 21.84-10.01 10.66-8.49 22.65-15.16 33.15-23.87 4.49-3.60 7.58-8.51 10.64-13.31 3.57-5.63 8.60-10.11 12.40-15.56 1.87-2.48 3.46-5.32 6.08-7.11 3.11-1.88 8.95.80 7.74 4.83-1.80 2.83-4.74 4.64-7.03 7.03-1.03 1.09-2.50 2.31-1.71 3.98 5.28 3.04 11.73 1.99 17.57 2.72 6.43.79 12.92-.29 18.85-2.89-6.03-6.95-14.44-11.04-21.96-16.10-6.64-4.40-14.45-8.54-17.54-16.36-3.54-9.21-4.72-19.41-10.33-27.75-5.11-8.46-14.18-13.27-23.00-16.97-6.31-2.75-13.38-2.23-19.89-4.21-16.71-5.51-31.16-16.68-48.49-20.49-7.86-1.89-16.12-.76-23.91-2.98-10.70-3.03-20.79-8.00-31.72-10.20-9.56-1.87-19.04 1.32-28.58 1.49-10.97.74-22.02-2.12-32.90.17-8.31 1.31-15.66 6.14-24.11 6.82-7.12.64-14.45 1.33-21.47-.45-9.87-2.37-19.31-6.79-29.53-7.53-8.46-.74-16.54 3.86-25.00 2.15-12.94-2.35-24.38-9.24-36.72-13.44-5.91-2.04-12.39-3.66-18.60-2.05m-395.26 82.73c-4.50 3.15-7.77 7.69-10.85 12.17 9.38-.92 18.92-2.35 27.49-6.46 2.24-.98 3.93-2.82 5.23-4.83-4.89-.82-9.85-1.04-14.76-1.73-2.36-.17-5.07-.71-7.11.85m1007.30 76.20c5.75.20 11.88 1.53 17.43-.51 5.00-4.94 8.53-11.24 12.26-17.17-12.21.37-21.66 9.45-29.69 17.68m77.81 130.97c-3.96 6.20-9.30 11.45-15.43 15.50-7.07 4.70-13.65 10.52-17.54 18.20 6.71-.75 13.28-2.35 19.84-3.92 4.85-1.14 8.31-4.92 12.21-7.74 4.56-3.52 9.91-5.92 14.22-9.78 1.86-1.67 3.63-4.02 3.07-6.69-1.14-5.74-4.69-11.26-9.92-14.05-2.69 2.37-4.47 5.53-6.45 8.48z" />
+
+                <!-- Text group -->
+                <g transform-origin="750 440" transform="scale(0.8, 1)">
+                     <text class="brightwing-text" x="750" y="440" text-anchor="middle" font-family="'Times New Roman', Times, Georgia, serif" font-weight="bold" font-size="140">BRIGHTWING</text>
+                </g>
+            </svg>
+        </div>
+        
+        <div id="loading" class="loading"><div class="loading-spinner"></div><span id="loading-text">Loading Character Sheet..</span></div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="stats-container" class="stats-container"></div>
+    </div>
+
+    <script>
+        // Procedurally generate stars behind the branches
+        window.onload = function() {
+            const starContainer = document.getElementById('stars-container');
+            const numStars = 50;
+            
+            for (let i = 0; i < numStars; i++) {
+                const star = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                const x = Math.random() * 1500;
+                const y = Math.random() * 500; 
+                const r = Math.random() * 1.2 + 0.4;
+                const duration = (6 + Math.random() * 6) + 's';
+                const delay = (Math.random() * 6) + 's';
+                
+                star.setAttribute('cx', x);
+                star.setAttribute('cy', y);
+                star.setAttribute('r', r);
+                star.setAttribute('fill', 'white');
+                star.setAttribute('class', 'star');
+                star.style.setProperty('--duration', duration);
+                star.style.setProperty('--delay', delay);
+                
+                starContainer.appendChild(star);
+            }
+        }
+
+        // Botanical Ornament: Curling stem with leaves
+        // Tips of leaves have opacity < 1 to simulate fading
+        const SVG_BOTANICAL = `
+            <svg class="ornament-corner ornament-top-left" viewBox="0 0 60 60">
+                <path d="M5,55 Q5,5 55,5" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.8" />
+                <!-- Leaf 1 -->
+                <path d="M5,55 Q10,35 25,35" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6" />
+                <path d="M25,35 Q30,35 32,30" fill="none" stroke="currentColor" stroke-width="1" opacity="0.4" />
+                <!-- Leaf 2 -->
+                <path d="M5,55 Q25,50 35,15" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6" />
+                <path d="M35,15 Q38,10 40,8" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3" />
+            </svg>
+            <svg class="ornament-corner ornament-bottom-right" viewBox="0 0 60 60">
+                <path d="M5,55 Q5,5 55,5" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.8" />
+                <path d="M5,55 Q10,35 25,35" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6" />
+                <path d="M25,35 Q30,35 32,30" fill="none" stroke="currentColor" stroke-width="1" opacity="0.4" />
+                <path d="M5,55 Q25,50 35,15" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6" />
+                <path d="M35,15 Q38,10 40,8" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3" />
+            </svg>
+        `;
+
+        const SVG_CRACK = `
+            <svg class="ornament-crack" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path d="M10,100 L15,90 L12,85 L20,70 L18,60 L22,50" vector-effect="non-scaling-stroke" />
+            </svg>
+        `;
+
+        const CONFIG = {
+            baseSheetId: '1fCqjePjNSEEvz8DTyXGTjlUlyR5VALe3tjYr8BgJFBo',
+            gids: {
+                detailed: '456052044',
+                attributes: '1256324159',
+                skills: '1138522272',
+                abilities: '1405420825',
+                items: '586277166'
+            },
+            attributeLayout: {
+                left: [
+                    { name: 'Strength', color: 'red', aliases: ['STR', 'Str', 'Strength'] },
+                    { name: 'Agility', color: 'red', aliases: ['AGI', 'Agi', 'Agility'] },
+                    { name: 'Constitution', color: 'red', aliases: ['CON', 'Con', 'Constitution'] },
+                    { name: 'Intelligence', color: 'blue', aliases: ['INT', 'Int', 'Intelligence'] },
+                    { name: 'Wisdom', color: 'blue', aliases: ['WIS', 'Wis', 'Wisdom'] },
+                    { name: 'Wits', color: 'blue', aliases: ['WIT', 'Wit', 'Wits'] },
+                    { name: 'Willpower',  color: 'yellow', aliases: ['WILL', 'Will', 'Willpower'] }
+                ],
+                right: [
+                    { name: 'Charisma', color: 'green', aliases: ['CHA', 'Cha', 'Charisma'] },
+                    { name: 'Manipulation', color: 'green', aliases: ['MNP', 'Mnp', 'Manipulation', 'MAN', 'Man'] },
+                    { name: 'Appearance', color: 'green', aliases: ['APP', 'App', 'Appearance'] },
+                    { name: 'Luck', color: 'purple', aliases: ['LUCK', 'Luck'] },
+                    { name: 'Prowess', color: 'purple', aliases: ['PRW', 'Prw', 'Prowess'] },
+                    { name: 'Protection', color: 'purple', aliases: ['PROT', 'Prot', 'Protection'] },
+                    { name: 'Dread', icon: '💀', color: 'yellow', aliases: ['DREAD', 'Dread', 'DRD'] }
+                ]
+            }
+        };
+        
+        const getConfig = (key) => getComputedStyle(document.documentElement).getPropertyValue(`--${key}`).trim().replace(/["']/g, '');
+        
+        const parseCSV = (text) => {
+            const rows = [];
+            let row = [], field = '', inQuotes = false;
+            
+            for (const c of text) {
+                if (c === '"') inQuotes = !inQuotes;
+                else if (c === ',' && !inQuotes) { row.push(field); field = ''; }
+                else if (c === '\n' && !inQuotes) { 
+                    row.push(field);
+                    if (row.length) rows.push(row);
+                    row = []; field = '';
+                } else if (c !== '\r') field += c;
+            }
+            
+            if (field || row.length) { row.push(field); rows.push(row); }
+            return rows;
+        };
+        
+        const fetchSheet = async (url) => {
+            const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+            ];
+            
+            for (const proxyUrl of proxies) {
+                try {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 4000);
+                    const response = await fetch(proxyUrl, { signal: controller.signal });
+                    clearTimeout(timeout);
+                    if (response.ok) return await response.text();
+                } catch { continue; }
+            }
+            throw new Error('All fetch attempts failed');
+        };
+        
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
+        const toggleSection = (header, content) => {
+            header.querySelector('.section-arrow').classList.toggle('open');
+            content.classList.toggle('open');
+        };
+        
+        // Helper to turn text block into paragraphs
+        const formatParagraphs = (text) => {
+             if (!text) return '';
+             // Split by newlines, filter out empty lines, wrap in P tags
+             return text.trim().split(/\n+/).map(line => `<p>${escapeHtml(line.trim())}</p>`).join('');
+        };
+        
+        const createStatItem = (name, desc, val, container) => {
+            const hasDesc = desc.trim().length > 0;
+            const item = document.createElement('div');
+            item.className = 'stat-item';
+            
+            item.innerHTML = `
+                <div class="stat-textbox ${hasDesc ? 'clickable' : ''}">
+                    <div class="stat-name">${escapeHtml(name)}</div>
+                    <div class="stat-value">${escapeHtml(val)}</div>
+                </div>
+                ${hasDesc ? `<div class="stat-details"><div class="details-content">${formatParagraphs(desc)}</div></div>` : ''}
+            `;
+            
+            if (hasDesc) {
+                item.querySelector('.stat-textbox').onclick = (e) => {
+                    e.stopPropagation();
+                    const active = item.classList.contains('active');
+                    container.querySelectorAll('.stat-item.active').forEach(i => {
+                        if (i !== item) i.classList.remove('active');
+                    });
+                    item.classList.toggle('active', !active);
+                };
+            }
+            
+            return item;
+        };
+        
+        const renderAttributesGrid = (data, title, placeholder) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'section-wrapper';
+            wrapper.innerHTML = SVG_BOTANICAL + SVG_CRACK; 
+            
+            const header = document.createElement('button');
+            header.className = 'section-header';
+            header.innerHTML = `<span class="section-arrow">➤</span>${title}`;
+            
+            const content = document.createElement('div');
+            content.className = 'section-content';
+            header.onclick = () => toggleSection(header, content);
+            
+            const csvAttributes = {};
+            data.forEach(row => {
+                const name = row[0]?.trim();
+                const value = (row.length >= 13 ? row[12] : row[row.length - 1] || '0').trim();
+                if (name) csvAttributes[name.toUpperCase()] = { displayName: name, value };
+            });
+            
+            const findAttrValue = (attrConfig) => {
+                for (const alias of attrConfig.aliases) {
+                    if (csvAttributes[alias.toUpperCase()]) return csvAttributes[alias.toUpperCase()];
+                }
+                for (const key in csvAttributes) {
+                    if (key.includes(attrConfig.name.toUpperCase().substring(0, 3))) return csvAttributes[key];
+                }
+                return { displayName: attrConfig.name, value: '0' };
+            };
+            
+            const createAttrItem = (attr) => {
+                const attrData = findAttrValue(attr);
+                const numericValue = parseFloat(attrData.value.replace(/[^0-9.]/g, '')) || 0;
+                const percentage = Math.min(Math.max(numericValue, 0), 100);
+                
+                // Added color class to attribute-item for card-level hover glow
+                return `<div class="attribute-item ${attr.color}">
+                    <div class="attribute-info">
+                        <div class="attribute-name ${attr.color}">
+                            ${escapeHtml(attrData.displayName)}
+                        </div>
+                        <div class="attribute-value">${escapeHtml(attrData.value)}</div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar ${attr.color}" style="width: ${percentage}%"></div>
+                    </div>
+                </div>`;
+            };
+            
+            const grid = document.createElement('div');
+            grid.className = 'attributes-grid';
+            
+            const leftColumn = document.createElement('div');
+            leftColumn.className = 'attribute-column';
+            leftColumn.innerHTML = CONFIG.attributeLayout.left.map(createAttrItem).join('');
+            
+            const rightColumn = document.createElement('div');
+            rightColumn.className = 'attribute-column';
+            rightColumn.innerHTML = CONFIG.attributeLayout.right.map(createAttrItem).join('');
+            
+            grid.append(leftColumn, rightColumn);
+            content.appendChild(grid);
+            wrapper.append(header, content);
+            placeholder.appendChild(wrapper);
+        };
+        
+        const renderDetailed = (data, title, placeholder, twoColumns, isItems) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'section-wrapper';
+            wrapper.innerHTML = SVG_BOTANICAL; 
+            
+            const header = document.createElement('button');
+            header.className = 'section-header';
+            header.innerHTML = `<span class="section-arrow">➤</span>${title}`;
+            
+            const content = document.createElement('div');
+            content.className = 'section-content';
+            header.onclick = () => toggleSection(header, content);
+            
+            const container = twoColumns ? document.createElement('div') : content;
+            if (twoColumns) {
+                container.className = 'two-column-grid';
+                content.appendChild(container);
+            }
+            
+            data.forEach(row => {
+                const [name = '', desc = '', val = ''] = row;
+                container.appendChild(createStatItem(name, desc, val, container));
+            });
+            
+            if (isItems) {
+                const sheetUrl = getConfig('sheet-url');
+                const linkLabel = getConfig('link-label');
+                
+                if (sheetUrl) {
+                    const linkItem = document.createElement('div');
+                    linkItem.className = 'stat-item sheet-link-item';
+                    linkItem.innerHTML = `
+                        <div class="stat-textbox clickable">
+                            <div class="stat-name">${escapeHtml(linkLabel)}</div>
+                            <div class="stat-value">↗</div>
+                        </div>
+                    `;
+                    linkItem.querySelector('.stat-textbox').onclick = (e) => {
+                        e.stopPropagation();
+                        window.open(sheetUrl, '_blank');
+                    };
+                    container.appendChild(linkItem);
+                }
+            }
+            
+            wrapper.append(header, content);
+            placeholder.appendChild(wrapper);
+        };
+        
+        const loadAllSheets = async () => {
+            const container = document.getElementById('stats-container');
+            const loadingEl = document.getElementById('loading');
+            
+            try {
+                const sections = [
+                    { key: 'detailed', title: 'Character Details', renderer: (d, t, p) => renderDetailed(d, t, p, true, false) },
+                    { key: 'attributes', title: 'Attributes', renderer: renderAttributesGrid },
+                    { key: 'skills', title: 'Skills', renderer: (d, t, p) => renderDetailed(d, t, p, true, false) },
+                    { key: 'abilities', title: 'Attainments', renderer: (d, t, p) => renderDetailed(d, t, p, true, false) },
+                    { key: 'items', title: getConfig('inventory-title'), renderer: (d, t, p) => renderDetailed(d, t, p, true, true) }
+                ];
+                
+                sections.forEach(({ key }) => {
+                    const placeholder = document.createElement('div');
+                    placeholder.id = `section-${key}`;
+                    placeholder.className = 'section-placeholder'; // Changed class to avoid pre-styling
+                    container.appendChild(placeholder);
+                });
+                
+                let loaded = 0;
+                const loadPromises = sections.map(async ({ key, title, renderer }, index) => {
+                    try {
+                        const url = `https://docs.google.com/spreadsheets/d/${CONFIG.baseSheetId}/export?format=csv&gid=${CONFIG.gids[key]}&range=${key === 'attributes' ? 'A2:M15' : 'A:C'}`;
+                        const csv = await fetchSheet(url);
+                        const data = parseCSV(csv);
+                        
+                        loaded++;
+                        document.getElementById('loading-text').textContent = `Loading Character Sheet... (${loaded}/${sections.length})`;
+                        
+                        const placeholder = document.getElementById(`section-${key}`);
+                        if (data.length && placeholder) {
+                            requestAnimationFrame(() => renderer(data, title, placeholder));
+                        }
+                    } catch (err) {
+                        console.error(`Failed to load ${key}:`, err);
+                        loaded++;
+                        const placeholder = document.getElementById(`section-${key}`);
+                        if (placeholder) placeholder.innerHTML = `<div class="error">Failed to load ${title}</div>`;
+                    }
+                });
+                
+                await Promise.all(loadPromises);
+                
+                loadingEl.style.transition = 'opacity 0.3s';
+                loadingEl.style.opacity = '0';
+                setTimeout(() => loadingEl.style.display = 'none', 300);
+                
+                requestAnimationFrame(() => {
+                    const firstSection = document.querySelector('.section-wrapper');
+                    if (firstSection) {
+                        const header = firstSection.querySelector('.section-header');
+                        const content = firstSection.querySelector('.section-content');
+                        toggleSection(header, content);
+                    }
+                });
+                
+            } catch (err) {
+                console.error('Critical error:', err);
+                loadingEl.style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to interpret the ancient texts.';
+            }
+        };
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadAllSheets);
+        } else {
+            loadAllSheets();
+        }
+    </script>
+</body>
+</html>
