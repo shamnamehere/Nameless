@@ -936,13 +936,15 @@ body::after {
                 loadingEl.style.opacity = '0';
                 setTimeout(() => loadingEl.style.display = 'none', 300);
                 
-                requestAnimationFrame(() => {
-                    const firstSection = document.querySelector('.section-wrapper');
-                    if (firstSection) {
-                        const header = firstSection.querySelector('.section-header');
-                        const content = firstSection.querySelector('.section-content');
-                        toggleSection(header, content);
-                    }
+requestAnimationFrame(() => {
+                    const allSections = document.querySelectorAll('.section-wrapper');
+                    allSections.forEach(section => {
+                        const header = section.querySelector('.section-header');
+                        const content = section.querySelector('.section-content');
+                        if (header && content) {
+                            toggleSection(header, content);
+                        }
+                    });
                 });
                 
             } catch (err) {
