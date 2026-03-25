@@ -437,7 +437,7 @@ body::after {
 }
         
         .details-content p {
-            margin-bottom: 1em;
+            margin-bottom: 0.15em;
         }
         .details-content p:last-child {
             margin-bottom: 0;
@@ -572,6 +572,55 @@ body::after {
             .stat-textbox { padding: 15px 20px; }
             .details-content { padding: 20px; }
         }
+    </style>
+
+    <style>
+      .section-content, .stat-details {
+          max-height: none !important;
+          overflow: visible !important;
+      }
+      .two-column-grid {
+          grid-template-columns: 1fr 1fr !important;
+      }
+      .section-arrow {
+          display: none !important;
+      }
+      .section-header, .stat-textbox {
+          cursor: default !important;
+      }
+      .section-header:hover {
+          color: var(--accent-bone) !important;
+          text-shadow: none !important;
+      }
+      .stat-textbox.clickable:hover {
+          background: transparent !important;
+          box-shadow: none !important;
+      }
+      .stat-textbox.clickable:hover .stat-name {
+          color: var(--text-primary) !important;
+          text-shadow: none !important;
+      }
+      .stat-textbox.clickable:hover .stat-value {
+          color: var(--accent-bone) !important;
+          text-shadow: none !important;
+          transform: none !important;
+      }
+    </style>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&display=swap');
+      .details-content, .details-content p {
+          font-family: 'Crimson Pro', serif !important;
+          font-size: 20px !important;
+          color: rgb(154, 144, 123) !important;
+          font-style: normal !important;
+      }
+    </style>
+
+    <style>
+      #section-detailed .two-column-grid {
+          grid-template-columns: 1fr !important;
+      }
     </style>
 </head>
 <body>
@@ -747,7 +796,7 @@ body::after {
         };
         
         const createStatItem = (name, desc, val, container) => {
-            const hasDesc = desc.trim().length > 0;
+            const hasDesc = desc && String(desc).trim().length > 0;
             const item = document.createElement('div');
             item.className = 'stat-item';
             
